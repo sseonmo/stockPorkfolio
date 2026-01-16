@@ -1,0 +1,22 @@
+# DB Dumps
+*.sql
+*.dump
+
+# Environment
+.env
+.venv
+venv/
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
