@@ -24,3 +24,24 @@ export function useRiskMetrics(days: number = 90) {
     queryFn: () => analyticsApi.getRiskMetrics(days),
   })
 }
+
+export function usePeriodReturns() {
+  return useQuery({
+    queryKey: ['analytics', 'period-returns'],
+    queryFn: analyticsApi.getPeriodReturns,
+  })
+}
+
+export function useMonthlyReturns() {
+  return useQuery({
+    queryKey: ['analytics', 'monthly-returns'],
+    queryFn: analyticsApi.getMonthlyReturns,
+  })
+}
+
+export function useWinLossStats(days: number = 365) {
+  return useQuery({
+    queryKey: ['analytics', 'win-loss', days],
+    queryFn: () => analyticsApi.getWinLossStats(days),
+  })
+}

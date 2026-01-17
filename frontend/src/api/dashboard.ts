@@ -31,16 +31,37 @@ export async function getAssetTrend(params: AssetTrendParams = {}): Promise<Asse
   return response.data
 }
 
+export interface DividendTrendResponse {
+  data: {
+    date: string
+    cumulative_dividend: number
+    daily_dividend: number
+  }[]
+  total_dividend: number
+}
+
+export async function getDividendTrend(params: AssetTrendParams = {}): Promise<DividendTrendResponse> {
+  const response = await api.get('/dashboard/dividend-trend', {
+    params,
+    paramsSerializer: (p) => qs.stringify(p, { arrayFormat: 'repeat' }),
+  })
+  return response.data
+}
+
 export async function getDailyPnlHistory(
   start_date?: string,
   end_date?: string,
-  stock_ids?: number[]
+  stock_ids?: number[],
+  skip?: number,
+  limit?: number
 ): Promise<DailyPnlHistoryResponse> {
   const response = await api.get('/dashboard/daily-pnl', {
     params: {
       start_date,
       end_date,
       stock_ids,
+      skip,
+      limit,
     },
     paramsSerializer: (params) => {
       return qs.stringify(params, { arrayFormat: 'repeat' })

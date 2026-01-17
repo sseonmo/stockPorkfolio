@@ -22,18 +22,18 @@ export function BenchmarkChart() {
   if (!comparison?.data) return null
 
   return (
-    <Card className="col-span-1 md:col-span-2 h-[400px]">
-      <div className="mb-6 flex items-center justify-between">
+    <Card className="h-full flex flex-col p-4">
+      <div className="mb-2 flex items-center justify-between shrink-0">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">벤치마크 비교</h3>
-          <p className="text-sm text-gray-500">포트폴리오 vs {comparison.benchmark_name} (지난 90일)</p>
+          <p className="text-sm text-gray-500">vs {comparison.benchmark_name}</p>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex space-x-1">
           {['SP500', 'NASDAQ', 'KOSPI'].map((b) => (
             <button
               key={b}
               onClick={() => setBenchmark(b)}
-              className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${benchmark === b
+              className={`px-2 py-1 text-[10px] font-medium rounded-full transition-colors ${benchmark === b
                   ? 'bg-blue-100 text-blue-700'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
@@ -44,7 +44,7 @@ export function BenchmarkChart() {
         </div>
       </div>
 
-      <div className="h-[300px] w-full">
+      <div className="flex-1 w-full min-h-0">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={comparison.data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />

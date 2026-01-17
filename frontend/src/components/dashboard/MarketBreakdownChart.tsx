@@ -9,9 +9,9 @@ const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444']
 export function MarketBreakdownChart() {
   const { data: breakdown, isLoading } = useMarketBreakdown()
 
-  if (isLoading) return <Card className="h-[400px] flex items-center justify-center"><Loading /></Card>
+  if (isLoading) return <Card className="h-full"><div className="h-full flex items-center justify-center"><Loading /></div></Card>
   if (!breakdown || breakdown.length === 0) return (
-    <Card className="h-[400px] flex flex-col">
+    <Card className="h-full flex flex-col">
       <div className="mb-4">
         <h3 className="text-lg font-semibold text-gray-900">시장별 비중</h3>
         <p className="text-sm text-gray-500">시장 지역별 노출</p>
@@ -30,13 +30,13 @@ export function MarketBreakdownChart() {
   }))
 
   return (
-    <Card className="h-[400px] flex flex-col">
+    <Card className="h-full flex flex-col">
       <div className="mb-4">
         <h3 className="text-lg font-semibold text-gray-900">시장별 비중</h3>
         <p className="text-sm text-gray-500">시장 지역별 노출</p>
       </div>
-      <div className="flex-1 w-full" style={{ minHeight: 0 }}>
-        <ResponsiveContainer width="100%" height={280}>
+      <div className="w-full flex-1" style={{ minHeight: 200 }}>
+        <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}

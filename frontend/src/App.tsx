@@ -3,6 +3,7 @@ import { Layout } from './components/layout/Layout'
 import { DashboardPage } from './pages/DashboardPage'
 import { HoldingsPage } from './pages/HoldingsPage'
 import { TransactionsPage } from './pages/TransactionsPage'
+import { DividendsPage } from './pages/DividendsPage'
 import { AnalyticsPage } from './pages/AnalyticsPage'
 import { LoginPage } from './pages/LoginPage'
 import { useUser } from './hooks/useAuth'
@@ -45,6 +46,7 @@ export default function App() {
           <Route index element={<DashboardPage />} />
           <Route path="holdings" element={<HoldingsPage />} />
           <Route path="transactions" element={<TransactionsPage />} />
+          <Route path="dividends" element={<DividendsPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
         </Route>
       </Routes>

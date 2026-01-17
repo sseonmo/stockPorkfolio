@@ -61,7 +61,7 @@ async def list_transactions(
     transaction_type: Annotated[TransactionType | None, Query()] = None,
     start_date: Annotated[date | None, Query()] = None,
     end_date: Annotated[date | None, Query()] = None,
-    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 1000,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[Transaction]:
     stmt = (

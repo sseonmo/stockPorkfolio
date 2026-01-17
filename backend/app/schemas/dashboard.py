@@ -50,3 +50,4 @@ class DailyPnlHistoryResponse(BaseModel):
     data: list[DailyPnlHistoryItem]
     total_pnl: float
     total_roi_percent: float
+    total_count: int = 0

@@ -4,7 +4,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import stocks, transactions, holdings, dashboard, analytics, auth, batch
+from app.api.routes import stocks, transactions, holdings, dashboard, analytics, auth, batch, dividends
 from app.core.config import settings
 from app.core.database import init_db, close_db
 
@@ -36,6 +36,7 @@ app.include_router(transactions.router, prefix="/api/transactions", tags=["trans
 app.include_router(holdings.router, prefix="/api/holdings", tags=["holdings"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
+app.include_router(dividends.router, prefix="/api/dividends", tags=["dividends"])
 app.include_router(batch.router, prefix="/api/batch", tags=["batch"])
 
 

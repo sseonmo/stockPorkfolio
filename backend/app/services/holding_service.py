@@ -6,6 +6,7 @@ from sqlalchemy.orm import selectinload
 from app.models.holding import Holding
 from app.models.transaction import Transaction, TransactionType
 from app.models.stock import Stock, MarketType
+from app.models.dividend import Dividend  # 추가
 from app.external.yfinance_client import yfinance_client
 
 
@@ -37,6 +38,16 @@ class HoldingService:
         total_dividends = Decimal("0")
         realized_gain = Decimal("0")
 
+        # 배당금 조회 및 합산
+        dividend_stmt = select(Dividend).where(
+            Dividend.user_id == user_id, Dividend.stock_id == stock_id
+        )
+        dividend_result = await db.execute(dividend_stmt)
+        dividends = dividend_result.scalars().all()
+        
+        for div in dividends:
+            total_dividends += Decimal(str(div.amount))
+
         for txn in transactions:
             txn_qty = Decimal(str(txn.quantity))
             txn_price = Decimal(str(txn.price))
@@ -60,9 +71,6 @@ class HoldingService:
                     total_cost -= sell_qty * avg_cost
                     total_cost_krw -= sell_qty * avg_cost_krw
                     quantity -= sell_qty
-
-            elif txn.transaction_type == TransactionType.DIVIDEND:
-                total_dividends += txn_qty * txn_price * txn_rate
 
         holding_stmt = select(Holding).where(
             Holding.user_id == user_id, Holding.stock_id == stock_id

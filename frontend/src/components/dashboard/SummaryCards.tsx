@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowUpRight, ArrowDownRight, DollarSign, Wallet, TrendingUp, Calendar } from 'lucide-react'
+import { ArrowUp, ArrowDown, DollarSign, Wallet, TrendingUp, Calendar } from 'lucide-react'
 import { Card } from '../ui/Card'
 import { usePortfolioSummary } from '../../hooks/useDashboard'
 import { formatCurrency, formatPercent, cn } from '../../lib/utils'
@@ -52,8 +52,8 @@ export function SummaryCards() {
       value: formatCurrency(displaySummary.total_unrealized_gain, 'KRW'),
       subValue: formatPercent(displaySummary.total_unrealized_gain_percent),
       icon: TrendingUp,
-      color: displaySummary.total_unrealized_gain >= 0 ? 'text-green-600' : 'text-red-600',
-      bg: displaySummary.total_unrealized_gain >= 0 ? 'bg-green-50' : 'bg-red-50',
+      color: displaySummary.total_unrealized_gain >= 0 ? 'text-red-600' : 'text-blue-600',
+      bg: displaySummary.total_unrealized_gain >= 0 ? 'bg-red-50' : 'bg-blue-50',
       isGain: true,
     },
     {
@@ -61,8 +61,8 @@ export function SummaryCards() {
       value: formatCurrency(displaySummary.daily_pnl, 'KRW'),
       subValue: formatPercent(displaySummary.daily_pnl_percent),
       icon: Calendar,
-      color: displaySummary.daily_pnl >= 0 ? 'text-green-600' : 'text-red-600',
-      bg: displaySummary.daily_pnl >= 0 ? 'bg-green-50' : 'bg-red-50',
+      color: displaySummary.daily_pnl >= 0 ? 'text-red-600' : 'text-blue-600',
+      bg: displaySummary.daily_pnl >= 0 ? 'bg-red-50' : 'bg-blue-50',
       isGain: true,
     },
   ]
@@ -95,13 +95,13 @@ export function SummaryCards() {
                 <span
                   className={cn(
                     'font-medium flex items-center',
-                    card.subValue.includes('-') ? 'text-red-600' : 'text-green-600'
+                    card.subValue.includes('-') ? 'text-blue-600' : 'text-red-600'
                   )}
                 >
                   {card.subValue.includes('-') ? (
-                    <ArrowDownRight className="mr-1 h-4 w-4" />
+                    <ArrowDown className="mr-1 h-4 w-4" />
                   ) : (
-                    <ArrowUpRight className="mr-1 h-4 w-4" />
+                    <ArrowUp className="mr-1 h-4 w-4" />
                   )}
                   {card.subValue}
                 </span>
@@ -112,7 +112,9 @@ export function SummaryCards() {
           </Card>
         ))}
       </div>
-      <DailyPnlModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      {isModalOpen && (
+        <DailyPnlModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      )}
     </>
   )
 }

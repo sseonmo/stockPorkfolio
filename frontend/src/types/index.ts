@@ -113,11 +113,19 @@ export interface AssetTrendResponse {
   max_drawdown_percent: number
 }
 
+export interface SectorStock {
+  name: string
+  ticker: string
+  value_krw: number
+  weight_percent: number
+}
+
 export interface SectorAllocation {
   sector: string
   value_krw: number
   weight_percent: number
   stock_count: number
+  stocks: SectorStock[]
 }
 
 export interface BenchmarkDataPoint {
@@ -164,4 +172,65 @@ export interface DailyPnlHistoryResponse {
   data: DailyPnlHistoryItem[]
   total_pnl: number
   total_roi_percent: number
+  total_count: number
+}
+
+export interface Dividend {
+  id: number
+  user_id: number
+  stock_id: number
+  amount: number
+  tax: number
+  currency: string
+  dividend_date: string
+  notes: string | null
+  created_at: string
+  stock: Stock
+}
+
+export interface DividendCreate {
+  stock_id: number
+  amount: number
+  tax: number
+  currency: string
+  dividend_date: string
+  notes?: string
+}
+
+export interface DividendUpdate {
+  amount?: number
+  tax?: number
+  dividend_date?: string
+  notes?: string
+}
+
+export interface PeriodReturns {
+  one_month: number
+  three_months: number
+  six_months: number
+  one_year: number
+  ytd: number
+}
+
+export interface MonthlyReturn {
+  year: number
+  month: number
+  return_percent: number
+  starting_value: number
+  ending_value: number
+}
+
+export interface WinLossStats {
+  total_days: number
+  up_days: number
+  down_days: number
+  flat_days: number
+  win_rate: number
+  avg_win_percent: number
+  avg_loss_percent: number
+  best_day: string | null
+  best_day_return: number
+  worst_day: string | null
+  worst_day_return: number
+  profit_factor: number
 }

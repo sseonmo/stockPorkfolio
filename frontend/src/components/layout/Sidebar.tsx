@@ -6,6 +6,7 @@ import {
   PieChart,
   LogOut,
   TrendingUp,
+  Banknote,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
@@ -13,6 +14,7 @@ const NAV_ITEMS = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard },
   { label: 'Holdings', path: '/holdings', icon: Wallet },
   { label: 'Transactions', path: '/transactions', icon: ArrowRightLeft },
+  { label: 'Dividends', path: '/dividends', icon: Banknote },
   { label: 'Analytics', path: '/analytics', icon: PieChart },
 ]
 

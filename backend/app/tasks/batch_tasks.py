@@ -13,6 +13,7 @@ from app.models.holding import Holding
 from app.models.daily_performance import DailyPerformance
 from app.models.market_data import MarketDataHistory
 from app.models.batch_job import BatchJobStatus, JobStatus
+from app.models.stock_daily_performance import StockDailyPerformance
 from app.external.kis_client import kis_client
 from app.external.yfinance_client import yfinance_client
 
@@ -285,9 +286,110 @@ def create_daily_performance_snapshot(self):
     return {"status": "success", "task": "create_daily_performance_snapshot"}
 
 
+async def _calculate_stock_daily_pnl():
+    async with get_db_context() as db:
+        job = BatchJobStatus(
+            job_name="calculate_stock_daily_pnl",
+            status=JobStatus.RUNNING,
+        )
+        db.add(job)
+        await db.flush()
+
+        try:
+            today = date.today()
+            processed = 0
+
+            stmt = select(Holding).options(selectinload(Holding.stock))
+            result = await db.execute(stmt)
+            all_holdings = result.scalars().all()
+            
+            user_ids = set(h.user_id for h in all_holdings)
+
+            for user_id in user_ids:
+                user_holdings = [h for h in all_holdings if h.user_id == user_id]
+                
+                for h in user_holdings:
+                    if not h.stock or h.quantity <= 0:
+                        continue
+                    
+                    yesterday_stmt = (
+                        select(StockDailyPerformance)
+                        .where(
+                            StockDailyPerformance.user_id == user_id,
+                            StockDailyPerformance.stock_id == h.stock_id,
+                            StockDailyPerformance.record_date < today
+                        )
+                        .order_by(StockDailyPerformance.record_date.desc())
+                        .limit(1)
+                    )
+                    yesterday_result = await db.execute(yesterday_stmt)
+                    yesterday_perf = yesterday_result.scalar_one_or_none()
+                    
+                    close_price = Decimal(str(h.stock.current_price or h.average_cost))
+                    prev_close = Decimal(str(yesterday_perf.close_price)) if yesterday_perf else close_price
+                    quantity = Decimal(str(h.quantity))
+                    
+                    daily_pnl = quantity * (close_price - prev_close)
+                    daily_pnl_pct = ((close_price - prev_close) / prev_close * 100) if prev_close > 0 else Decimal("0")
+                    position_value = quantity * close_price
+                    
+                    existing_stmt = select(StockDailyPerformance).where(
+                        StockDailyPerformance.user_id == user_id,
+                        StockDailyPerformance.stock_id == h.stock_id,
+                        StockDailyPerformance.record_date == today
+                    )
+                    existing_result = await db.execute(existing_stmt)
+                    existing = existing_result.scalar_one_or_none()
+                    
+                    if existing:
+                        existing.quantity = float(quantity)
+                        existing.close_price = float(close_price)
+                        existing.prev_close_price = float(prev_close)
+                        existing.daily_pnl = float(daily_pnl)
+                        existing.daily_pnl_percent = float(daily_pnl_pct)
+                        existing.position_value = float(position_value)
+                    else:
+                        stock_perf = StockDailyPerformance(
+                            user_id=user_id,
+                            stock_id=h.stock_id,
+                            record_date=today,
+                            quantity=float(quantity),
+                            close_price=float(close_price),
+                            prev_close_price=float(prev_close),
+                            daily_pnl=float(daily_pnl),
+                            daily_pnl_percent=float(daily_pnl_pct),
+                            position_value=float(position_value)
+                        )
+                        db.add(stock_perf)
+                    
+                    processed += 1
+
+            job.status = JobStatus.SUCCESS
+            job.completed_at = datetime.utcnow()
+            job.records_processed = processed
+
+        except Exception as e:
+            job.status = JobStatus.FAILED
+            job.completed_at = datetime.utcnow()
+            job.error_message = str(e)
+            raise
+
+
 @celery_app.task(name="app.tasks.batch_tasks.refresh_kis_token")
 def refresh_kis_token():
     async def _refresh():
         await kis_client._get_access_token()
     asyncio.run(_refresh())
     return {"status": "success", "task": "refresh_kis_token"}
+
+
+@celery_app.task(
+    bind=True,
+    name="app.tasks.batch_tasks.calculate_stock_daily_pnl",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def calculate_stock_daily_pnl(self):
+    asyncio.run(_calculate_stock_daily_pnl())
+    return {"status": "success", "task": "calculate_stock_daily_pnl"}
