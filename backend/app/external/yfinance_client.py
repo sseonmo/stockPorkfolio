@@ -19,7 +19,11 @@ def _sync_get_stock_info(ticker: str) -> dict[str, Any] | None:
         return {
             "ticker": ticker,
             "name": info.get("shortName", info.get("longName", ticker)),
+            "open_price": info.get("regularMarketOpen"),
+            "high_price": info.get("regularMarketDayHigh"),
+            "low_price": info.get("regularMarketDayLow"),
             "current_price": info.get("regularMarketPrice"),
+            "volume": info.get("regularMarketVolume"),
             "currency": info.get("currency", "USD"),
             "exchange": info.get("exchange", ""),
             "sector": info.get("sector"),

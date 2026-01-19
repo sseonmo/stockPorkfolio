@@ -23,17 +23,13 @@ celery_app.conf.update(
 )
 
 celery_app.conf.beat_schedule = {
-    "update-kr-prices-daily": {
+    "update-kr-prices-hourly": {
         "task": "app.tasks.batch_tasks.update_kr_stock_prices",
-        "schedule": crontab(hour=16, minute=5, day_of_week="mon-fri"),
+        "schedule": crontab(minute=5, hour="9-16", day_of_week="mon-fri"),
     },
     "update-us-prices-daily": {
         "task": "app.tasks.batch_tasks.update_us_stock_prices",
         "schedule": crontab(hour=6, minute=5, day_of_week="tue-sat"),
-    },
-    "create-daily-snapshot": {
-        "task": "app.tasks.batch_tasks.create_daily_performance_snapshot",
-        "schedule": crontab(hour=7, minute=0),
     },
     "refresh-kis-token": {
         "task": "app.tasks.batch_tasks.refresh_kis_token",

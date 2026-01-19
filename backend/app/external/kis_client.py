@@ -1,4 +1,7 @@
 import asyncio
+import json
+import logging
+import os
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -7,82 +10,135 @@ import httpx
 from app.core.config import settings
 from app.services.krx_master import search_by_name
 
+logger = logging.getLogger(__name__)
 
-import json
-import os
 
 class KISClient:
     TOKEN_FILE = "kis_token_cache.json"
+    TOKEN_MAX_AGE_HOURS = 23
 
     def __init__(self):
         self._access_token: str | None = None
         self._token_expires_at: datetime | None = None
+        self._token_issued_at: datetime | None = None
         self._lock = asyncio.Lock()
 
-    def _load_token_from_disk(self):
+    def _is_token_valid(self, expires_at: datetime, issued_at: datetime | None) -> bool:
+        now = datetime.now()
+        
+        if now >= expires_at:
+            logger.info("Token expired (past expires_at)")
+            return False
+        
+        if issued_at:
+            hours_since_issued = (now - issued_at).total_seconds() / 3600
+            if hours_since_issued >= self.TOKEN_MAX_AGE_HOURS:
+                logger.info(f"Token too old: {hours_since_issued:.1f} hours since issued")
+                return False
+        
+        return True
+
+    def _load_token_from_disk(self) -> str | None:
         if not os.path.exists(self.TOKEN_FILE):
             return None
         try:
             with open(self.TOKEN_FILE, "r") as f:
                 data = json.load(f)
+                
                 expires_at_str = data.get("expires_at")
                 if not expires_at_str:
                     return None
+                    
                 expires_at = datetime.fromisoformat(expires_at_str)
-                if datetime.now() < expires_at:
+                issued_at_str = data.get("issued_at")
+                issued_at = datetime.fromisoformat(issued_at_str) if issued_at_str else None
+                
+                if self._is_token_valid(expires_at, issued_at):
                     self._access_token = data.get("access_token")
                     self._token_expires_at = expires_at
+                    self._token_issued_at = issued_at
                     return self._access_token
-        except Exception:
-            # Ignore errors, just fail to load
-            pass
+                    
+        except Exception as e:
+            logger.warning(f"Failed to load token from disk: {e}")
         return None
 
-    def _save_token_to_disk(self, token: str, expires_at: datetime):
+    def _save_token_to_disk(self, token: str, expires_at: datetime, issued_at: datetime):
         try:
             with open(self.TOKEN_FILE, "w") as f:
                 json.dump({
                     "access_token": token,
-                    "expires_at": expires_at.isoformat()
+                    "expires_at": expires_at.isoformat(),
+                    "issued_at": issued_at.isoformat()
                 }, f)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to save token to disk: {e}")
 
-    async def _get_access_token(self) -> str:
+    def _invalidate_token(self):
+        self._access_token = None
+        self._token_expires_at = None
+        self._token_issued_at = None
+        try:
+            if os.path.exists(self.TOKEN_FILE):
+                os.remove(self.TOKEN_FILE)
+                logger.info("Token cache file removed")
+        except Exception as e:
+            logger.warning(f"Failed to remove token cache file: {e}")
+
+    async def _request_new_token(self) -> str:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{settings.kis_base_url}/oauth2/tokenP",
+                json={
+                    "grant_type": "client_credentials",
+                    "appkey": settings.kis_app_key,
+                    "appsecret": settings.kis_app_secret,
+                },
+            )
+            
+            if response.status_code != 200:
+                error_detail = response.text
+                logger.error(f"Token request failed: {response.status_code} - {error_detail}")
+                raise httpx.HTTPStatusError(
+                    f"Token request failed: {response.status_code}",
+                    request=response.request,
+                    response=response
+                )
+            
+            data = response.json()
+            access_token = data.get("access_token")
+            
+            if not access_token:
+                raise ValueError("No access_token in response")
+            
+            expires_in = int(data.get("expires_in", 86400))
+            now = datetime.now()
+            expires_at = now + timedelta(seconds=expires_in - 300)
+            
+            self._access_token = access_token
+            self._token_expires_at = expires_at
+            self._token_issued_at = now
+            
+            self._save_token_to_disk(access_token, expires_at, now)
+            logger.info(f"New token issued, expires at {expires_at}")
+            
+            return access_token
+
+    async def _get_access_token(self, force_refresh: bool = False) -> str:
         async with self._lock:
-            # 1. Check memory cache
-            if self._access_token and self._token_expires_at and datetime.now() < self._token_expires_at:
+            if force_refresh:
+                logger.info("Force refreshing token")
+                self._invalidate_token()
+            
+            if (self._access_token and self._token_expires_at and 
+                self._is_token_valid(self._token_expires_at, self._token_issued_at)):
                 return self._access_token
 
-            # 2. Check disk cache
             loaded_token = self._load_token_from_disk()
             if loaded_token:
                 return loaded_token
 
-            # 3. Request new token
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{settings.kis_base_url}/oauth2/tokenP",
-                    json={
-                        "grant_type": "client_credentials",
-                        "appkey": settings.kis_app_key,
-                        "appsecret": settings.kis_app_secret,
-                    },
-                )
-                response.raise_for_status()
-                data = response.json()
-                self._access_token = data["access_token"]
-                expires_in = int(data.get("expires_in", 86400))
-                # Expire 5 minutes early to be safe
-                self._token_expires_at = datetime.now() + timedelta(seconds=expires_in - 300)
-                
-                if self._access_token is None:
-                    raise ValueError("Failed to get access token")
-
-                # 4. Save to disk
-                self._save_token_to_disk(self._access_token, self._token_expires_at)
-                
-                return self._access_token
+            return await self._request_new_token()
 
     async def _request(
         self,
@@ -91,6 +147,7 @@ class KISClient:
         tr_id: str,
         params: dict[str, Any] | None = None,
         data: dict[str, Any] | None = None,
+        _retry: bool = True,
     ) -> dict[str, Any]:
         token = await self._get_access_token()
         headers = {
@@ -101,7 +158,7 @@ class KISClient:
             "content-type": "application/json; charset=utf-8",
         }
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.request(
                 method,
                 f"{settings.kis_base_url}{endpoint}",
@@ -109,6 +166,12 @@ class KISClient:
                 params=params,
                 json=data,
             )
+            
+            if response.status_code in (400, 401) and _retry:
+                logger.warning(f"API request failed with {response.status_code}, refreshing token and retrying")
+                self._invalidate_token()
+                return await self._request(method, endpoint, tr_id, params, data, _retry=False)
+            
             response.raise_for_status()
             return response.json()
 
@@ -169,9 +232,11 @@ class KISClient:
 
     async def get_stock_price(self, ticker: str) -> dict[str, Any] | None:
         if not settings.kis_app_key:
-            # Mock data (random variations based on ticker to keep it consistent-ish or just static)
             return {
                 "ticker": ticker,
+                "open_price": 71500.0 if ticker == "005930" else 9800.0,
+                "high_price": 72500.0 if ticker == "005930" else 10200.0,
+                "low_price": 71000.0 if ticker == "005930" else 9700.0,
                 "current_price": 72000.0 if ticker == "005930" else 10000.0,
                 "change": 100.0,
                 "change_percent": 0.5,
@@ -188,6 +253,9 @@ class KISClient:
             output = result.get("output", {})
             return {
                 "ticker": ticker,
+                "open_price": float(output.get("stck_oprc", 0)),
+                "high_price": float(output.get("stck_hgpr", 0)),
+                "low_price": float(output.get("stck_lwpr", 0)),
                 "current_price": float(output.get("stck_prpr", 0)),
                 "change": float(output.get("prdy_vrss", 0)),
                 "change_percent": float(output.get("prdy_ctrt", 0)),

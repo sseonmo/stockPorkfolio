@@ -18,7 +18,8 @@ from app.external.kis_client import kis_client
 from app.external.yfinance_client import yfinance_client
 
 
-async def _update_kr_prices():
+async def _update_kr_prices(target_date: date | None = None):
+    target = target_date or date.today()
     async with get_db_context() as db:
         job = BatchJobStatus(
             job_name="update_kr_stock_prices",
@@ -33,7 +34,6 @@ async def _update_kr_prices():
             stocks = result.scalars().all()
 
             processed = 0
-            today = date.today()
             for stock in stocks:
                 price_data = await kis_client.get_stock_price(stock.ticker)
                 if price_data and price_data.get("current_price"):
@@ -41,18 +41,26 @@ async def _update_kr_prices():
                     
                     existing_stmt = select(MarketDataHistory).where(
                         MarketDataHistory.stock_id == stock.id,
-                        MarketDataHistory.record_date == today,
+                        MarketDataHistory.record_date == target,
                     )
                     existing_result = await db.execute(existing_stmt)
                     existing = existing_result.scalar_one_or_none()
                     
                     if existing:
+                        existing.open_price = price_data.get("open_price")
+                        existing.high_price = price_data.get("high_price")
+                        existing.low_price = price_data.get("low_price")
                         existing.close_price = price_data["current_price"]
+                        existing.volume = price_data.get("volume")
                     else:
                         market_data = MarketDataHistory(
                             stock_id=stock.id,
-                            record_date=today,
+                            record_date=target,
+                            open_price=price_data.get("open_price"),
+                            high_price=price_data.get("high_price"),
+                            low_price=price_data.get("low_price"),
                             close_price=price_data["current_price"],
+                            volume=price_data.get("volume"),
                         )
                         db.add(market_data)
                     processed += 1
@@ -66,9 +74,13 @@ async def _update_kr_prices():
             job.completed_at = datetime.utcnow()
             job.error_message = str(e)
             raise
+    
+    await _calculate_stock_daily_pnl(target)
+    await _create_daily_snapshot(target)
 
 
-async def _update_us_prices():
+async def _update_us_prices(target_date: date | None = None):
+    target = target_date or date.today()
     async with get_db_context() as db:
         job = BatchJobStatus(
             job_name="update_us_stock_prices",
@@ -83,7 +95,6 @@ async def _update_us_prices():
             stocks = result.scalars().all()
 
             processed = 0
-            today = date.today()
             for stock in stocks:
                 info = await yfinance_client.get_stock_info(stock.ticker)
                 if info and info.get("current_price"):
@@ -91,18 +102,26 @@ async def _update_us_prices():
                     
                     existing_stmt = select(MarketDataHistory).where(
                         MarketDataHistory.stock_id == stock.id,
-                        MarketDataHistory.record_date == today,
+                        MarketDataHistory.record_date == target,
                     )
                     existing_result = await db.execute(existing_stmt)
                     existing = existing_result.scalar_one_or_none()
                     
                     if existing:
+                        existing.open_price = info.get("open_price")
+                        existing.high_price = info.get("high_price")
+                        existing.low_price = info.get("low_price")
                         existing.close_price = info["current_price"]
+                        existing.volume = info.get("volume")
                     else:
                         market_data = MarketDataHistory(
                             stock_id=stock.id,
-                            record_date=today,
+                            record_date=target,
+                            open_price=info.get("open_price"),
+                            high_price=info.get("high_price"),
+                            low_price=info.get("low_price"),
                             close_price=info["current_price"],
+                            volume=info.get("volume"),
                         )
                         db.add(market_data)
                     processed += 1
@@ -116,9 +135,13 @@ async def _update_us_prices():
             job.completed_at = datetime.utcnow()
             job.error_message = str(e)
             raise
+    
+    await _calculate_stock_daily_pnl(target)
+    await _create_daily_snapshot(target)
 
 
-async def _create_daily_snapshot():
+async def _create_daily_snapshot(target_date: date | None = None):
+    target = target_date or date.today()
     async with get_db_context() as db:
         job = BatchJobStatus(
             job_name="create_daily_performance_snapshot",
@@ -139,7 +162,6 @@ async def _create_daily_snapshot():
             user_ids = list(set(h.user_id for h in result.scalars().all()))
 
             processed = 0
-            today = date.today()
 
             for user_id in user_ids:
                 stmt = (
@@ -180,7 +202,7 @@ async def _create_daily_snapshot():
                     select(DailyPerformance)
                     .where(
                         DailyPerformance.user_id == user_id,
-                        DailyPerformance.record_date < today,
+                        DailyPerformance.record_date < target,
                     )
                     .order_by(DailyPerformance.record_date.desc())
                     .limit(1)
@@ -203,7 +225,7 @@ async def _create_daily_snapshot():
 
                 existing_perf_stmt = select(DailyPerformance).where(
                     DailyPerformance.user_id == user_id,
-                    DailyPerformance.record_date == today,
+                    DailyPerformance.record_date == target,
                 )
                 existing_perf_result = await db.execute(existing_perf_stmt)
                 existing_perf = existing_perf_result.scalar_one_or_none()
@@ -223,7 +245,7 @@ async def _create_daily_snapshot():
                 else:
                     perf = DailyPerformance(
                         user_id=user_id,
-                        record_date=today,
+                        record_date=target,
                         total_value_krw=float(total_value_krw),
                         total_invested_krw=float(total_invested_krw),
                         kr_value=float(kr_value),
@@ -286,7 +308,8 @@ def create_daily_performance_snapshot(self):
     return {"status": "success", "task": "create_daily_performance_snapshot"}
 
 
-async def _calculate_stock_daily_pnl():
+async def _calculate_stock_daily_pnl(target_date: date | None = None):
+    target = target_date or date.today()
     async with get_db_context() as db:
         job = BatchJobStatus(
             job_name="calculate_stock_daily_pnl",
@@ -296,7 +319,6 @@ async def _calculate_stock_daily_pnl():
         await db.flush()
 
         try:
-            today = date.today()
             processed = 0
 
             stmt = select(Holding).options(selectinload(Holding.stock))
@@ -317,7 +339,7 @@ async def _calculate_stock_daily_pnl():
                         .where(
                             StockDailyPerformance.user_id == user_id,
                             StockDailyPerformance.stock_id == h.stock_id,
-                            StockDailyPerformance.record_date < today
+                            StockDailyPerformance.record_date < target
                         )
                         .order_by(StockDailyPerformance.record_date.desc())
                         .limit(1)
@@ -336,7 +358,7 @@ async def _calculate_stock_daily_pnl():
                     existing_stmt = select(StockDailyPerformance).where(
                         StockDailyPerformance.user_id == user_id,
                         StockDailyPerformance.stock_id == h.stock_id,
-                        StockDailyPerformance.record_date == today
+                        StockDailyPerformance.record_date == target
                     )
                     existing_result = await db.execute(existing_stmt)
                     existing = existing_result.scalar_one_or_none()
@@ -352,7 +374,7 @@ async def _calculate_stock_daily_pnl():
                         stock_perf = StockDailyPerformance(
                             user_id=user_id,
                             stock_id=h.stock_id,
-                            record_date=today,
+                            record_date=target,
                             quantity=float(quantity),
                             close_price=float(close_price),
                             prev_close_price=float(prev_close),

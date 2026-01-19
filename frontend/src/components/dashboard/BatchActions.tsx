@@ -34,6 +34,7 @@ function BatchButton({ label, icon: Icon, onClick, isLoading, color }: BatchButt
 export function BatchActions() {
   const queryClient = useQueryClient()
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [targetDate, setTargetDate] = useState<string>('')
 
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text })
@@ -46,7 +47,7 @@ export function BatchActions() {
   }
 
   const krPricesMutation = useMutation({
-    mutationFn: batchApi.updateKrPrices,
+    mutationFn: (date?: string) => batchApi.updateKrPrices(date),
     onSuccess: (data) => {
       showMessage('success', data.message)
       invalidateQueries()
@@ -55,7 +56,7 @@ export function BatchActions() {
   })
 
   const usPricesMutation = useMutation({
-    mutationFn: batchApi.updateUsPrices,
+    mutationFn: (date?: string) => batchApi.updateUsPrices(date),
     onSuccess: (data) => {
       showMessage('success', data.message)
       invalidateQueries()
@@ -64,7 +65,7 @@ export function BatchActions() {
   })
 
   const snapshotMutation = useMutation({
-    mutationFn: batchApi.createSnapshot,
+    mutationFn: (date?: string) => batchApi.createSnapshot(date),
     onSuccess: (data) => {
       showMessage('success', data.message)
       invalidateQueries()
@@ -73,7 +74,7 @@ export function BatchActions() {
   })
 
   const refreshAllMutation = useMutation({
-    mutationFn: batchApi.refreshAll,
+    mutationFn: (date?: string) => batchApi.refreshAll(date),
     onSuccess: (data) => {
       showMessage('success', data.message)
       invalidateQueries()
@@ -96,32 +97,39 @@ export function BatchActions() {
           </span>
         )}
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="date"
+          value={targetDate}
+          onChange={(e) => setTargetDate(e.target.value)}
+          className="px-3 py-2 rounded-lg text-sm border border-gray-200 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          title="대상 날짜 (비워두면 오늘)"
+        />
         <BatchButton
           label="KR 가격"
           icon={TrendingUp}
-          onClick={() => krPricesMutation.mutate()}
+          onClick={() => krPricesMutation.mutate(targetDate || undefined)}
           isLoading={krPricesMutation.isPending}
           color="text-blue-600 bg-blue-50 hover:bg-blue-100"
         />
         <BatchButton
           label="US 가격"
           icon={DollarSign}
-          onClick={() => usPricesMutation.mutate()}
+          onClick={() => usPricesMutation.mutate(targetDate || undefined)}
           isLoading={usPricesMutation.isPending}
           color="text-green-600 bg-green-50 hover:bg-green-100"
         />
         <BatchButton
           label="스냅샷"
           icon={Database}
-          onClick={() => snapshotMutation.mutate()}
+          onClick={() => snapshotMutation.mutate(targetDate || undefined)}
           isLoading={snapshotMutation.isPending}
           color="text-violet-600 bg-violet-50 hover:bg-violet-100"
         />
         <BatchButton
           label="전체 새로고침"
           icon={RefreshCw}
-          onClick={() => refreshAllMutation.mutate()}
+          onClick={() => refreshAllMutation.mutate(targetDate || undefined)}
           isLoading={refreshAllMutation.isPending}
           color="text-orange-600 bg-orange-50 hover:bg-orange-100"
         />
