@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react'
 import { useHoldings } from '../../hooks/useHoldings'
-import { MarketType } from '../../types'
+import { MarketType, Holding } from '../../types'
 import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { formatCurrency, formatPercent, cn } from '../../lib/utils'
 import { ArrowUpRight, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { TransactionHistoryModal } from './TransactionHistoryModal'
 
 interface HoldingsTableProps {
   market: MarketType | 'ALL'
@@ -23,6 +24,7 @@ export function HoldingsTable({ market }: HoldingsTableProps) {
   const { data: holdings } = useHoldings(queryMarket)
   const [currentPage, setCurrentPage] = useState(1)
   const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'current_value_krw', direction: 'desc' })
+  const [selectedHolding, setSelectedHolding] = useState<Holding | null>(null)
   const itemsPerPage = 20
 
   const handleSort = (field: SortField) => {
@@ -117,7 +119,11 @@ export function HoldingsTable({ market }: HoldingsTableProps) {
             {paginatedHoldings.map((holding) => {
               const isGain = holding.unrealized_gain >= 0
               return (
-                <tr key={holding.id} className="hover:bg-gray-50/50 transition-colors">
+                <tr 
+                  key={holding.id} 
+                  className="hover:bg-gray-50/50 transition-colors cursor-pointer"
+                  onClick={() => setSelectedHolding(holding)}
+                >
                   <td className="px-6 py-4">
                     <div className="flex items-center">
                       <div>
@@ -165,6 +171,14 @@ export function HoldingsTable({ market }: HoldingsTableProps) {
           </tbody>
         </table>
       </div>
+
+      {selectedHolding && (
+        <TransactionHistoryModal
+          isOpen={!!selectedHolding}
+          onClose={() => setSelectedHolding(null)}
+          holding={selectedHolding}
+        />
+      )}
 
       {totalPages > 1 && (
         <div className="px-6 py-4 border-t border-gray-200 bg-gray-50/50">

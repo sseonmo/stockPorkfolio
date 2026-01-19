@@ -46,6 +46,8 @@ export interface Transaction {
   total_amount: number
   total_amount_krw: number
   stock: Stock
+  realized_gain?: number
+  realized_gain_percent?: number
 }
 
 export interface TransactionCreate {
@@ -233,4 +235,12 @@ export interface WinLossStats {
   worst_day: string | null
   worst_day_return: number
   profit_factor: number
+}
+
+export interface TransactionPageResponse {
+  content: Transaction[]
+  total_elements: number
+  total_pages: number
+  current_page: number
+  available_years: number[]
 }

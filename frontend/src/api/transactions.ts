@@ -1,5 +1,5 @@
 import api from '../lib/api'
-import type { Transaction, TransactionCreate, TransactionType } from '../types'
+import type { Transaction, TransactionCreate, TransactionType, TransactionPageResponse } from '../types'
 
 export async function getTransactions(params?: {
   stock_id?: number
@@ -35,4 +35,16 @@ export async function updateTransaction(
 
 export async function deleteTransaction(id: number): Promise<void> {
   await api.delete(`/transactions/${id}`)
+}
+
+export async function getTransactionsByStock(
+  stockId: number,
+  params?: {
+    year?: number
+    page?: number
+    size?: number
+  }
+): Promise<TransactionPageResponse> {
+  const response = await api.get(`/transactions/by-stock/${stockId}`, { params })
+  return response.data
 }

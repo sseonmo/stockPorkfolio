@@ -56,3 +56,13 @@ class TransactionWithStock(BaseModel):
     total_amount: float
     total_amount_krw: float
     stock: StockResponse
+    realized_gain: float | None = None
+    realized_gain_percent: float | None = None
+
+
+class TransactionPageResponse(BaseModel):
+    content: list[TransactionWithStock]
+    total_elements: int
+    total_pages: int
+    current_page: int
+    available_years: list[int]
